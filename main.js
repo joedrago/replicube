@@ -1,11 +1,26 @@
+// --------------------------------------------------------------------------------------
+// ThreeJS / Lua Imports
+
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js"
 import * as luainjs from "lua-in-js"
 
+// --------------------------------------------------------------------------------------
+// Editor Plumbing
+
 import ace from "ace-builds"
 import "ace-builds/src-noconflict/theme-tomorrow_night"
 import "ace-builds/src-noconflict/mode-lua"
+
+var editor = ace.edit("editor")
+editor.setTheme("ace/theme/tomorrow_night")
+editor.session.setMode("ace/mode/lua")
+editor.setHighlightActiveLine(false)
+editor.resize()
+
+// --------------------------------------------------------------------------------------
+// Querystring nonsense
 
 function qs(name) {
     name = name.replace(/[\[\]]/g, "\\$&")
@@ -19,17 +34,10 @@ function qs(name) {
     return decodeURIComponent(results[2].replace(/\+/g, " "))
 }
 
-var editor = ace.edit("editor")
-editor.setTheme("ace/theme/tomorrow_night")
-editor.session.setMode("ace/mode/lua")
-editor.setHighlightActiveLine(false)
-editor.resize()
-
 let replicateScript = qs("lua")
 if (!replicateScript || replicateScript.length <= 0) {
     replicateScript = "-- Enjoy!\n\nreturn RED\n"
 }
-// document.getElementById("lua").value = replicateScript
 editor.setValue(replicateScript, -1)
 
 let startingCubeSize = qs("s")
@@ -37,78 +45,70 @@ if (startingCubeSize && startingCubeSize.length > 0) {
     document.getElementById("s").value = startingCubeSize
 }
 
+// --------------------------------------------------------------------------------------
+// ThreeJS constants/globals and helpers
+
+const CUBE_GEOMETRY = new RoundedBoxGeometry(1, 1, 1)
+
 const PALETTE = [
-    0x000000, // 0 (unused)
-    0xdfe9f5, // 1
-    0x697594, // 2
-    0x101517, // 3
-    0xf7aaa8, // 4
-    0xd4689a, // 5
-    0x782c96, // 6
-    0xe83562, // 7
-    0xf2825c, // 8
-    0xffc76e, // 9
-    0x88c44d, // 10
-    0x3f9e59, // 11
-    0x373461, // 12
-    0x4854a8, // 13
-    0x7199d9, // 14
-    0x9e5252, // 15
-    0x4d2536 // 16
+    null, // unused
+    { value: 0xdfe9f5, name: "WHITE" },
+    { value: 0x697594, name: "GREY" },
+    { value: 0x101517, name: "BLACK" },
+    { value: 0xf7aaa8, name: "PEACH" },
+    { value: 0xd4689a, name: "PINK" },
+    { value: 0x782c96, name: "PURPLE" },
+    { value: 0xe83562, name: "RED" },
+    { value: 0xf2825c, name: "ORANGE" },
+    { value: 0xffc76e, name: "YELLOW" },
+    { value: 0x88c44d, name: "LIGHTGREEN" },
+    { value: 0x3f9e59, name: "GREEN" },
+    { value: 0x373461, name: "DARKBLUE" },
+    { value: 0x4854a8, name: "BLUE" },
+    { value: 0x7199d9, name: "LIGHTBLUE" },
+    { value: 0x9e5252, name: "BROWN" },
+    { value: 0x4d2536, name: "DARKBROWN" }
 ]
 
-const luaPrepend = `
-local WHITE = 1
-local GREY = 2
-local BLACK = 3
-local PEACH = 4
-local PINK = 5
-local PURPLE = 6
-local RED = 7
-local ORANGE = 8
-local YELLOW = 9
-local LIGHTGREEN = 10
-local GREEN = 11
-local DARKBLUE = 12
-local BLUE = 13
-local LIGHTBLUE = 14
-local BROWN = 15
-local DARKBROWN = 16
-local abs = math.abs
-`
-
-function createMaterial(paletteIndex) {
-    const material = new THREE.MeshPhongMaterial({
-        side: THREE.DoubleSide,
-        color: PALETTE[paletteIndex]
-    })
-    return material
+function getColorMaterial(paletteIndex) {
+    if (paletteIndex < 1 || paletteIndex > PALETTE.length) {
+        return null
+    }
+    const color = PALETTE[paletteIndex]
+    if (!color.material) {
+        color.material = new THREE.MeshPhongMaterial({
+            side: THREE.DoubleSide,
+            color: color.value
+        })
+    }
+    return color.material
 }
 
 function addCube(scene, x, y, z, paletteIndex) {
-    if (paletteIndex < 1 || paletteIndex > 16) {
+    const material = getColorMaterial(paletteIndex)
+    if (!material) {
         return
     }
-    // const geometry = new THREE.BoxGeometry(1, 1, 1)
-    const geometry = new RoundedBoxGeometry(1, 1, 1)
-
-    const material = createMaterial(paletteIndex)
-    const cube = new THREE.Mesh(geometry, material)
+    const cube = new THREE.Mesh(CUBE_GEOMETRY, material)
     cube.position.x = x
     cube.position.y = y
     cube.position.z = z
     scene.add(cube)
 }
 
-const viewDiv = document.getElementById("view")
-const width = viewDiv.clientWidth
-const height = viewDiv.clientHeight
+// --------------------------------------------------------------------------------------
+// Lua meat and potatoes
 
-const scene = new THREE.Scene()
-scene.background = new THREE.Color(0x365987)
-const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000)
+// This sets up the global available to Lua
+let LUA_INJECT = `
+local abs = math.abs
+`
+for (let colorIndex = 1; colorIndex < PALETTE.length; ++colorIndex) {
+    const color = PALETTE[colorIndex]
+    LUA_INJECT += `local ${color.name} = ${colorIndex}\n`
+}
 
-window.evalReplicubeScript = function () {
+window.evalReplicubeScript = function (scene) {
     const cubesizeDiv = document.getElementById("s")
     const cubeSize = parseInt(cubesizeDiv.value)
 
@@ -131,6 +131,7 @@ window.evalReplicubeScript = function () {
     }
 
     document.getElementById("error").innerHTML = ""
+    let luaInjectLineCount = 0
     for (let x = -cubeSize; x <= cubeSize; ++x) {
         for (let y = -cubeSize; y <= cubeSize; ++y) {
             for (let z = -cubeSize; z <= cubeSize; ++z) {
@@ -143,14 +144,26 @@ window.evalReplicubeScript = function () {
                     function () {} // function called by os.exit
                 )
                 let luaState = `\nlocal x=${x}\nlocal y=${y}\nlocal z=${z}\n`
+                let luaInject = LUA_INJECT + luaState
+                if (luaInjectLineCount < 1) {
+                    luaInjectLineCount = luaInject.split(/\n/).length - 1
+                    console.log(`luaInjectLineCount: ${luaInjectLineCount}`)
+                }
                 let luaScript
                 let returnValue
                 try {
-                    luaScript = luaEnv.parse(luaPrepend + luaState + replicateScript)
+                    luaScript = luaEnv.parse(luaInject + replicateScript)
                     returnValue = luaScript.exec()
                 } catch (parseError) {
-                    console.log(`Parse Error: `, parseError)
-                    document.getElementById("error").innerHTML = parseError
+                    let errorText = parseError.toString()
+                    console.log(errorText)
+                    let matches = errorText.match(/SyntaxError: \[(\d+):(\d+)\]/)
+                    if (matches) {
+                        let row = parseInt(matches[1]) - luaInjectLineCount
+                        let col = matches[2]
+                        errorText = errorText.replace(/SyntaxError: \[\d+:\d+\]/, `SyntaxError: [${row}:${col}]`)
+                    }
+                    document.getElementById("error").innerHTML = errorText
                     return
                 }
                 if (returnValue === undefined || isNaN(returnValue)) {
@@ -163,6 +176,32 @@ window.evalReplicubeScript = function () {
     }
 }
 
+// --------------------------------------------------------------------------------------
+// Initialize ThreeJS renderer/camera
+
+const viewDiv = document.getElementById("view")
+const width = viewDiv.clientWidth
+const height = viewDiv.clientHeight
+
+const scene = new THREE.Scene()
+scene.background = new THREE.Color(0x365987)
+const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000)
+const renderer = new THREE.WebGLRenderer()
+renderer.setSize(width, height)
+renderer.setAnimationLoop(() => {
+    controls.update()
+    renderer.render(scene, camera)
+})
+viewDiv.appendChild(renderer.domElement)
+
+camera.position.x = 10
+camera.position.y = 10
+camera.position.z = 20
+const controls = new OrbitControls(camera, renderer.domElement)
+
+// --------------------------------------------------------------------------------------
+// Hooks for updating querystring, pumping render, responding to dom events
+
 function updatePermalink() {
     let form = document.getElementById("repform")
     let formData = new FormData(form)
@@ -174,7 +213,7 @@ function updatePermalink() {
     history.replaceState("here", "", newURL)
 }
 
-window.cubeSizeChanged = function (ev) {
+window.rebuildScene = () => {
     const cubesizeDiv = document.getElementById("s")
     const cubesizeLabel = document.getElementById("cubesizelabel")
     const cubeSize = parseInt(cubesizeDiv.value)
@@ -182,30 +221,14 @@ window.cubeSizeChanged = function (ev) {
     replicateScript = editor.getValue()
 
     updatePermalink()
-    evalReplicubeScript()
+    evalReplicubeScript(scene)
 }
 
-const renderer = new THREE.WebGLRenderer()
-renderer.setSize(width, height)
-renderer.setAnimationLoop(animate)
-viewDiv.appendChild(renderer.domElement)
-
-camera.position.x = 10
-camera.position.y = 10
-camera.position.z = 20
-const controls = new OrbitControls(camera, renderer.domElement)
-
-window.cubeSizeChanged()
-
-editor.session.on("change", function (delta) {
-    cubeSizeChanged()
+window.rebuildScene()
+editor.session.on("change", (delta) => {
+    rebuildScene()
 })
 
-function animate() {
-    controls.update()
-    renderer.render(scene, camera)
-}
-
-window.onresize = function () {
+window.onresize = () => {
     location.reload()
 }
