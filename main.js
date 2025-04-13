@@ -99,7 +99,7 @@ function addCube(scene, x, y, z, paletteIndex) {
 // --------------------------------------------------------------------------------------
 // Lua meat and potatoes
 
-// This sets up the global available to Lua
+// This sets up the globals available to Lua (functions, color constants, etc)
 let LUA_INJECT = `
 local abs = math.abs
 `
