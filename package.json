@@ -1,0 +1,19 @@
+{
+  "name": "replicube",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "serve": "npx vite",
+    "build": "npx vite build"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "lua-in-js": "^2.2.5",
+    "three": "^0.175.0"
+  },
+  "devDependencies": {
+    "vite": "^6.2.6"
+  }
+}
