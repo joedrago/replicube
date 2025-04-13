@@ -6,10 +6,12 @@
     "serve": "npx vite",
     "build": "npx vite build"
   },
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "type": "module",
+  "author": "Joe Drago",
+  "license": "BSD",
+  "description": "Replicube Viewer",
   "dependencies": {
+    "ace-builds": "^1.39.1",
     "lua-in-js": "^2.2.5",
     "three": "^0.175.0"
   },

@@ -3,6 +3,10 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js"
 import * as luainjs from "lua-in-js"
 
+import ace from "ace-builds"
+import "ace-builds/src-noconflict/theme-tomorrow_night"
+import "ace-builds/src-noconflict/mode-lua"
+
 function qs(name) {
     name = name.replace(/[\[\]]/g, "\\$&")
 
