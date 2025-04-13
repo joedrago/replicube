@@ -201,3 +201,7 @@ function animate() {
     controls.update()
     renderer.render(scene, camera)
 }
+
+window.onresize = function () {
+    location.reload()
+}
